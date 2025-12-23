@@ -37,14 +37,29 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    // ユーザーのロールを取得
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    // ユーザーのロールをJWTメタデータから取得（DB クエリを回避）
+    // 認証コールバック時にroleをuser_metadataに保存している
+    let role = user.user_metadata?.role
 
-    if (!profile || profile.role !== 'admin') {
+    // フォールバック: JWTにroleがない場合はDBから取得（既存ユーザー対応）
+    if (!role) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      role = profile?.role
+
+      // 次回以降の高速化のため、roleをJWTに保存
+      if (role) {
+        await supabase.auth.updateUser({
+          data: { role },
+        })
+      }
+    }
+
+    if (role !== 'admin') {
       // 管理者でない場合はトップページにリダイレクト
       return NextResponse.redirect(new URL('/', request.url))
     }
@@ -55,6 +70,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

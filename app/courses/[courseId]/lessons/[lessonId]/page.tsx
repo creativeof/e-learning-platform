@@ -58,6 +58,8 @@ export default async function LessonPage({ params }: PageProps) {
   const supabase = await createClient()
 
   // レッスンデータを取得（キャッシュされた関数を使用）
+  // Note: getLesson() は現在のレッスン、セクション、コース情報、
+  // および同じセクション内の全レッスンを1クエリで取得（ナビゲーション用）
   const { lesson, error } = await getLesson(lessonId)
 
   if (error || !lesson) {
@@ -69,10 +71,11 @@ export default async function LessonPage({ params }: PageProps) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // 講座の全セクションを取得して、最初のレッスンかどうかを判定
+  // 講座の全セクションとレッスンを取得（サイドバー表示用）
+  // 必要な最小限のフィールドのみ取得してパフォーマンスを最適化
   const { data: allSections } = await supabase
     .from('sections')
-    .select('*, lessons(*)')
+    .select('id, title, "order", lessons(id, title, "order")')
     .eq('course_id', courseId)
     .order('"order"', { ascending: true })
 

@@ -144,67 +144,34 @@ export async function moveLessonUp(lessonId: string) {
 
   const supabase = await createClient()
 
-  // 現在のレッスンを取得
-  const { data: currentLesson } = await supabase
+  // Use atomic PostgreSQL function for order swapping
+  const { data, error } = await supabase.rpc('swap_lesson_order', {
+    p_lesson_id: lessonId,
+    p_direction: 'up',
+  })
+
+  if (error) {
+    console.error('Error swapping lesson order:', error)
+    throw new Error('レッスンの順序変更に失敗しました')
+  }
+
+  // Check result
+  if (!data || data.length === 0 || !data[0].success) {
+    const message = data?.[0]?.message || '順序の変更ができませんでした'
+    return { success: false, message }
+  }
+
+  // Get course ID for revalidation
+  const { data: lesson } = await supabase
     .from('lessons')
-    .select('*')
+    .select('section:sections(course_id)')
     .eq('id', lessonId)
     .single()
 
-  if (!currentLesson) throw new Error('レッスンが見つかりません')
-
-  // 1つ上のレッスンを取得
-  const { data: previousLessons, error: previousError } = await supabase
-    .from('lessons')
-    .select('*')
-    .eq('section_id', currentLesson.section_id)
-    .lt('"order"', currentLesson.order)
-
-  if (previousError) {
-    console.error('Error fetching previous lesson:', previousError)
-    throw new Error('前のレッスンの取得に失敗しました')
-  }
-
-  if (!previousLessons || previousLessons.length === 0) {
-    return { success: false } // 既に最上位
-  }
-
-  // クライアント側でソートして最後の要素（最大のorder値）を取得
-  const previousLesson = previousLessons.sort((a, b) => b.order - a.order)[0]
-
-  // 順序を入れ替え（一時的な値を使用して競合を回避）
-  const tempOrder = -999999
-  const currentOrder = currentLesson.order
-  const previousOrder = previousLesson.order
-
-  // 1. 現在のレッスンを一時的な値に変更
-  await supabase
-    .from('lessons')
-    .update({ order: tempOrder })
-    .eq('id', currentLesson.id)
-
-  // 2. 前のレッスンを現在の位置に移動
-  await supabase
-    .from('lessons')
-    .update({ order: currentOrder })
-    .eq('id', previousLesson.id)
-
-  // 3. 現在のレッスンを前の位置に移動
-  await supabase
-    .from('lessons')
-    .update({ order: previousOrder })
-    .eq('id', currentLesson.id)
-
-  // courseIdを取得してrevalidate
-  const { data: section } = await supabase
-    .from('sections')
-    .select('course_id')
-    .eq('id', currentLesson.section_id)
-    .single()
-
-  if (section) {
-    revalidatePath(`/admin/courses/${section.course_id}/edit`)
-    revalidatePath(`/courses/${section.course_id}`)
+  if (lesson?.section) {
+    const courseId = (lesson.section as any).course_id
+    revalidatePath(`/admin/courses/${courseId}/edit`)
+    revalidatePath(`/courses/${courseId}`)
   }
 
   return { success: true }
@@ -215,67 +182,34 @@ export async function moveLessonDown(lessonId: string) {
 
   const supabase = await createClient()
 
-  // 現在のレッスンを取得
-  const { data: currentLesson } = await supabase
+  // Use atomic PostgreSQL function for order swapping
+  const { data, error } = await supabase.rpc('swap_lesson_order', {
+    p_lesson_id: lessonId,
+    p_direction: 'down',
+  })
+
+  if (error) {
+    console.error('Error swapping lesson order:', error)
+    throw new Error('レッスンの順序変更に失敗しました')
+  }
+
+  // Check result
+  if (!data || data.length === 0 || !data[0].success) {
+    const message = data?.[0]?.message || '順序の変更ができませんでした'
+    return { success: false, message }
+  }
+
+  // Get course ID for revalidation
+  const { data: lesson } = await supabase
     .from('lessons')
-    .select('*')
+    .select('section:sections(course_id)')
     .eq('id', lessonId)
     .single()
 
-  if (!currentLesson) throw new Error('レッスンが見つかりません')
-
-  // 1つ下のレッスンを取得
-  const { data: nextLessons, error: nextError } = await supabase
-    .from('lessons')
-    .select('*')
-    .eq('section_id', currentLesson.section_id)
-    .gt('"order"', currentLesson.order)
-
-  if (nextError) {
-    console.error('Error fetching next lesson:', nextError)
-    throw new Error('次のレッスンの取得に失敗しました')
-  }
-
-  if (!nextLessons || nextLessons.length === 0) {
-    return { success: false } // 既に最下位
-  }
-
-  // クライアント側でソートして最初の要素（最小のorder値）を取得
-  const nextLesson = nextLessons.sort((a, b) => a.order - b.order)[0]
-
-  // 順序を入れ替え（一時的な値を使用して競合を回避）
-  const tempOrder = -999999
-  const currentOrder = currentLesson.order
-  const nextOrder = nextLesson.order
-
-  // 1. 現在のレッスンを一時的な値に変更
-  await supabase
-    .from('lessons')
-    .update({ order: tempOrder })
-    .eq('id', currentLesson.id)
-
-  // 2. 次のレッスンを現在の位置に移動
-  await supabase
-    .from('lessons')
-    .update({ order: currentOrder })
-    .eq('id', nextLesson.id)
-
-  // 3. 現在のレッスンを次の位置に移動
-  await supabase
-    .from('lessons')
-    .update({ order: nextOrder })
-    .eq('id', currentLesson.id)
-
-  // courseIdを取得してrevalidate
-  const { data: section } = await supabase
-    .from('sections')
-    .select('course_id')
-    .eq('id', currentLesson.section_id)
-    .single()
-
-  if (section) {
-    revalidatePath(`/admin/courses/${section.course_id}/edit`)
-    revalidatePath(`/courses/${section.course_id}`)
+  if (lesson?.section) {
+    const courseId = (lesson.section as any).course_id
+    revalidatePath(`/admin/courses/${courseId}/edit`)
+    revalidatePath(`/courses/${courseId}`)
   }
 
   return { success: true }

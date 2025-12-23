@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import { createClient } from '@/lib/supabase/server'
+import { CourseDetail } from '@/lib/types/entities'
 
 /**
  * 講座データを取得（メタデータとページコンポーネント間でキャッシュ）
@@ -21,7 +22,7 @@ export const getCourse = cache(async (courseId: string) => {
     .eq('id', courseId)
     .single()
 
-  return { course, error }
+  return { course: course as CourseDetail | null, error }
 })
 
 /**

@@ -9,6 +9,7 @@ import { Suspense } from 'react'
 import CourseProgress from '@/app/_components/course/CourseProgress'
 import CourseCurriculumAsync from '@/app/_components/course/CourseCurriculumAsync'
 import { ProgressSkeleton, CurriculumSkeleton } from '@/app/_components/ui/Skeleton'
+import { SortedSection } from '@/lib/types/entities'
 
 interface PageProps {
   params: Promise<{
@@ -65,11 +66,11 @@ export default async function CourseDetailPage({ params }: PageProps) {
   }
 
   // セクションをorder順にソート
-  const sortedSections = course.sections
-    ?.sort((a: any, b: any) => a.order - b.order)
-    .map((section: any) => ({
+  const sortedSections: SortedSection[] = course.sections
+    ?.sort((a, b) => a.order - b.order)
+    .map((section) => ({
       ...section,
-      lessons: section.lessons?.sort((a: any, b: any) => a.order - b.order) || [],
+      lessons: section.lessons?.sort((a, b) => a.order - b.order) || [],
     })) || []
 
   // 最初のレッスンを取得

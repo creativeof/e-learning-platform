@@ -28,6 +28,20 @@ export async function GET(request: Request) {
           updated_at: new Date().toISOString(),
         })
 
+      // ユーザーのroleを取得してJWTに保存（Middleware最適化のため）
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      // roleをuser_metadataに保存（DBクエリを減らすため）
+      if (profile?.role) {
+        await supabase.auth.updateUser({
+          data: { role: profile.role },
+        })
+      }
+
       return NextResponse.redirect(`${origin}${next}`)
     }
   }
